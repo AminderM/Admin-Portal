@@ -24,14 +24,39 @@ sudo mkdir -p "$APP_DIR"
 cd "$APP_DIR"
 sudo tar -xzf /tmp/build.tar.gz
 
+if [ ! -d "$BUILD_DIR" ]; then
+    echo "❌ ERROR: Build directory not found at $BUILD_DIR"
+    echo "📋 Contents of $APP_DIR:"
+    ls -la "$APP_DIR"
+    exit 1
+fi
+
+if [ -z "$(ls -A $BUILD_DIR)" ]; then
+    echo "❌ ERROR: Build directory is empty"
+    exit 1
+fi
+
+echo "✅ Build directory verified at $BUILD_DIR"
+
 echo "🔐 Setting permissions..."
 sudo chown -R $USER:$USER "$APP_DIR"
 sudo chmod -R 755 "$APP_DIR"
+
+sudo mkdir -p "$LOG_DIR"
+sudo chown -R $USER:$USER "$LOG_DIR"
+sudo chmod -R 755 "$LOG_DIR"
 
 if ! command -v serve &> /dev/null; then
     echo "📥 Installing serve..."
     sudo npm install -g serve
 fi
+
+SERVE_PATH=$(which serve)
+if [ -z "$SERVE_PATH" ]; then
+    echo "❌ ERROR: serve command not found after installation"
+    exit 1
+fi
+echo "✅ serve found at: $SERVE_PATH"
 
 if ! command -v pm2 &> /dev/null; then
     echo "📥 Installing PM2..."
@@ -40,6 +65,14 @@ if ! command -v pm2 &> /dev/null; then
 fi
 
 sudo cp /tmp/ecosystem.config.js "$APP_DIR/ecosystem.config.js"
+
+if [ ! -f "$BUILD_DIR/index.html" ]; then
+    echo "❌ ERROR: index.html not found in build directory"
+    echo "📋 Build directory contents:"
+    ls -la "$BUILD_DIR" | head -10
+    exit 1
+fi
+echo "✅ Build directory contains index.html"
 
 echo "🛑 Stopping existing application..."
 cd "$APP_DIR"
