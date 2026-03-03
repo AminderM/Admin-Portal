@@ -1,9 +1,4 @@
-#!/bin/bash
-
-# Deployment script for Admin Portal on EC2
-# This script handles the deployment process using PM2
-
-set -e  # Exit on any error
+set -e  
 
 APP_NAME="admin-portal-staging"
 APP_DIR="/var/www/admin-portal"
@@ -28,7 +23,6 @@ sudo rm -rf "$BUILD_DIR"
 sudo mkdir -p "$APP_DIR"
 cd "$APP_DIR"
 sudo tar -xzf /tmp/build.tar.gz
-# The build directory should now be at $APP_DIR/build
 
 echo "🔐 Setting permissions..."
 sudo chown -R $USER:$USER "$APP_DIR"

@@ -11,7 +11,7 @@ env:
 
 jobs:
   deploy:
-    name: Build and Deploy to EC2
+    name: Admin Portal Staging Deployment
     runs-on: ubuntu-latest
     
     steps:
