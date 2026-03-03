@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'admin-portal-staging',
       script: 'npx',
-      args: 'serve -s /var/www/admin-portal/build -l 3001',
+      args: 'serve -s /var/www/admin-portal/build -l 3001 --no-clipboard',
       instances: 1,
       exec_mode: 'fork',
       watch: false,

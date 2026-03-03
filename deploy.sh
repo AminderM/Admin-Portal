@@ -74,6 +74,11 @@ if [ ! -f "$BUILD_DIR/index.html" ]; then
 fi
 echo "✅ Build directory contains index.html"
 
+echo "📅 Build timestamp verification:"
+echo "   index.html modified: $(stat -c %y "$BUILD_DIR/index.html" 2>/dev/null || stat -f "%Sm" "$BUILD_DIR/index.html" 2>/dev/null || echo "unknown")"
+echo "   Build directory size: $(du -sh "$BUILD_DIR" | cut -f1)"
+echo "   Number of files: $(find "$BUILD_DIR" -type f | wc -l)"
+
 echo "🛑 Stopping existing application..."
 cd "$APP_DIR"
 pm2 stop "$APP_NAME" || true
@@ -82,7 +87,16 @@ pm2 delete "$APP_NAME" || true
 echo "▶️  Starting application with PM2..."
 pm2 start ecosystem.config.js
 
+sleep 2
+
 pm2 save
+
+MAIN_JS=$(find "$BUILD_DIR/static/js" -name "main.*.js" 2>/dev/null | head -1)
+if [ -n "$MAIN_JS" ]; then
+    echo "📦 Main JS file: $(basename "$MAIN_JS")"
+    echo "   Size: $(du -h "$MAIN_JS" | cut -f1)"
+    echo "   Modified: $(stat -c %y "$MAIN_JS" 2>/dev/null || stat -f "%Sm" "$MAIN_JS" 2>/dev/null || echo "unknown")"
+fi
 
 echo "📊 Application status:"
 pm2 status
@@ -90,4 +104,9 @@ pm2 status
 echo "✅ Deployment completed successfully!"
 echo "🌐 Application should be running on port 3001"
 echo "📝 View logs with: pm2 logs $APP_NAME"
+echo ""
+echo "⚠️  IMPORTANT: If you see old content in browser:"
+echo "   1. Hard refresh: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)"
+echo "   2. Or clear browser cache for this site"
+echo "   3. Or open in incognito/private window"
 
