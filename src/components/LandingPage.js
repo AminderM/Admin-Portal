@@ -19,8 +19,8 @@ const LandingPage = () => {
               </span>
             </h1>
             <p className="text-xl md:text-2xl mb-8 text-gray-300 max-w-3xl mx-auto">
-              The ultimate marketplace connecting manufacturers, fleet owners, and drivers. 
-              Streamline equipment rental, fleet management, and real-time tracking in one platform.
+              {/* The ultimate marketplace connecting manufacturers, fleet owners, and drivers. 
+              Streamline equipment rental, fleet management, and real-time tracking in one platform. */}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
