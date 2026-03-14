@@ -16,11 +16,13 @@ import {
   Zap,
   RefreshCw,
   Wifi,
-  WifiOff
+  WifiOff,
+  Calendar
 } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-const ANALYTICS_BACKEND_URL = 'https://api.staging.integratedtech.ca';
+// Use the backend URL from environment or default to staging
+const ANALYTICS_BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://api.staging.integratedtech.ca';
 
 const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
   const [loading, setLoading] = useState(true);
@@ -28,19 +30,24 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
   const [realtime, setRealtime] = useState(null);
   const [heatmapData, setHeatmapData] = useState(null);
   const [selectedPage, setSelectedPage] = useState('/pricing');
+  const [daysRange, setDaysRange] = useState(7);
+  const [heatmapDays, setHeatmapDays] = useState(30);
   const [wsConnected, setWsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const pingIntervalRef = useRef(null);
 
-  // Fetch Overview KPIs
-  const fetchOverview = useCallback(async () => {
+  // Fetch Overview KPIs with days parameter
+  const fetchOverview = useCallback(async (days = daysRange) => {
     try {
-      const response = await fetchWithAuth(`${ANALYTICS_BACKEND_URL}/api/dashboard/overview`);
+      const response = await fetchWithAuth(`${ANALYTICS_BACKEND_URL}/api/dashboard/overview?days=${days}`);
       if (response.ok) {
         const data = await response.json();
         setOverview(data);
+        return data;
       } else {
+        console.warn('Overview endpoint returned:', response.status);
         // Use mock data if endpoint not available
         setOverview(generateMockOverview());
       }
@@ -48,7 +55,7 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
       console.log('Using mock overview data:', error);
       setOverview(generateMockOverview());
     }
-  }, [fetchWithAuth]);
+  }, [fetchWithAuth, daysRange]);
 
   // Fetch Realtime Data
   const fetchRealtime = useCallback(async () => {
@@ -57,7 +64,9 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
       if (response.ok) {
         const data = await response.json();
         setRealtime(data);
+        return data;
       } else {
+        console.warn('Realtime endpoint returned:', response.status);
         setRealtime(generateMockRealtime());
       }
     } catch (error) {
@@ -66,114 +75,197 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
     }
   }, [fetchWithAuth]);
 
-  // Fetch Heatmap Data
-  const fetchHeatmap = useCallback(async (pageUrl) => {
+  // Fetch Heatmap Data with page_url and days parameters
+  const fetchHeatmap = useCallback(async (pageUrl, days = heatmapDays) => {
     try {
-      const response = await fetchWithAuth(`${ANALYTICS_BACKEND_URL}/api/dashboard/heatmap-data?page_url=${encodeURIComponent(pageUrl)}`);
+      const response = await fetchWithAuth(
+        `${ANALYTICS_BACKEND_URL}/api/dashboard/heatmap-data?page_url=${encodeURIComponent(pageUrl)}&days=${days}`
+      );
       if (response.ok) {
         const data = await response.json();
         setHeatmapData(data);
+        return data;
       } else {
+        console.warn('Heatmap endpoint returned:', response.status);
         setHeatmapData(generateMockHeatmap(pageUrl));
       }
     } catch (error) {
       console.log('Using mock heatmap data:', error);
       setHeatmapData(generateMockHeatmap(pageUrl));
     }
-  }, [fetchWithAuth]);
-
-  // WebSocket Connection for Real-time Updates
-  const connectWebSocket = useCallback(() => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const wsUrl = `wss://api.staging.integratedtech.ca/api/ws/analytics?token=${token}`;
-      
-      wsRef.current = new WebSocket(wsUrl);
-      
-      wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
-        setWsConnected(true);
-        toast.success('Real-time analytics connected');
-      };
-      
-      wsRef.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          setLastUpdate(new Date());
-          
-          if (data.type === 'realtime_update') {
-            setRealtime(prev => ({ ...prev, ...data.payload }));
-          } else if (data.type === 'overview_update') {
-            setOverview(prev => ({ ...prev, ...data.payload }));
-          }
-        } catch (e) {
-          console.error('WebSocket message parse error:', e);
-        }
-      };
-      
-      wsRef.current.onclose = () => {
-        console.log('WebSocket disconnected');
-        setWsConnected(false);
-        // Attempt reconnect after 5 seconds
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
-      };
-      
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setWsConnected(false);
-      };
-    } catch (error) {
-      console.log('WebSocket connection failed, using polling:', error);
-      setWsConnected(false);
-    }
-  }, []);
+  }, [fetchWithAuth, heatmapDays]);
 
   // Initial data load
   useEffect(() => {
+    let isMounted = true;
+    
     const loadData = async () => {
+      if (!isMounted) return;
       setLoading(true);
       await Promise.all([
-        fetchOverview(),
+        fetchOverview(daysRange),
         fetchRealtime(),
-        fetchHeatmap(selectedPage)
+        fetchHeatmap(selectedPage, heatmapDays)
       ]);
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
     
     loadData();
-    connectWebSocket();
-    
-    // Poll for updates every 30 seconds as fallback
-    const pollInterval = setInterval(() => {
-      if (!wsConnected) {
-        fetchRealtime();
-      }
-    }, 30000);
     
     return () => {
-      clearInterval(pollInterval);
+      isMounted = false;
+    };
+  }, [fetchOverview, fetchRealtime, fetchHeatmap, selectedPage, daysRange, heatmapDays]);
+
+  // Separate effect for WebSocket connection
+  useEffect(() => {
+    // Connect WebSocket on mount
+    const initWebSocket = () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          console.warn('No auth token for WebSocket connection');
+          return;
+        }
+        
+        // Use wss:// for secure connections
+        const wsProtocol = ANALYTICS_BACKEND_URL.startsWith('https') ? 'wss' : 'ws';
+        const wsHost = ANALYTICS_BACKEND_URL.replace(/^https?:\/\//, '');
+        const wsUrl = `${wsProtocol}://${wsHost}/api/ws/analytics?token=${token}`;
+        
+        wsRef.current = new WebSocket(wsUrl);
+        
+        wsRef.current.onopen = () => {
+          console.log('WebSocket connected');
+          setWsConnected(true);
+          toast.success('Real-time analytics connected');
+          
+          // Keep alive ping every 30 seconds
+          pingIntervalRef.current = setInterval(() => {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send('ping');
+            }
+          }, 30000);
+        };
+        
+        wsRef.current.onmessage = (event) => {
+          // Handle pong response
+          if (event.data === 'pong') return;
+          
+          try {
+            const { type, payload } = JSON.parse(event.data);
+            setLastUpdate(new Date());
+            
+            switch (type) {
+              case 'realtime_update':
+                setRealtime(prev => ({ ...prev, ...payload }));
+                break;
+              case 'overview_update':
+                setOverview(prev => ({ ...prev, ...payload }));
+                break;
+              case 'new_visitor':
+                console.log('New visitor:', payload);
+                break;
+              case 'new_pageview':
+                console.log('New pageview:', payload);
+                break;
+              case 'new_conversion':
+                console.log('New conversion:', payload);
+                toast.success(`New conversion: ${payload.event_name}`);
+                break;
+              default:
+                console.log('Unknown WebSocket message type:', type);
+            }
+          } catch (e) {
+            console.error('WebSocket message parse error:', e);
+          }
+        };
+        
+        wsRef.current.onclose = () => {
+          console.log('WebSocket disconnected');
+          setWsConnected(false);
+          if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+          }
+          // Attempt reconnect after 5 seconds
+          reconnectTimeoutRef.current = setTimeout(initWebSocket, 5000);
+        };
+        
+        wsRef.current.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setWsConnected(false);
+        };
+      } catch (error) {
+        console.log('WebSocket connection failed, using polling:', error);
+        setWsConnected(false);
+      }
+    };
+    
+    initWebSocket();
+    
+    // Cleanup on unmount
+    return () => {
       if (wsRef.current) {
         wsRef.current.close();
       }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
     };
-  }, [fetchOverview, fetchRealtime, fetchHeatmap, selectedPage, connectWebSocket, wsConnected]);
+  }, []);
+
+  // Polling interval effect
+  useEffect(() => {
+    // Poll for realtime updates every 30 seconds as fallback when WS disconnected
+    const pollInterval = setInterval(() => {
+      if (!wsConnected) {
+        fetchRealtime();
+      }
+    }, 30000);
+    
+    // Refresh overview every 60 seconds
+    const overviewInterval = setInterval(() => {
+      fetchOverview(daysRange);
+    }, 60000);
+    
+    return () => {
+      clearInterval(pollInterval);
+      clearInterval(overviewInterval);
+    };
+  }, [fetchRealtime, fetchOverview, daysRange, wsConnected]);
 
   // Handle page selection change for heatmap
   const handlePageChange = (page) => {
     setSelectedPage(page);
-    fetchHeatmap(page);
+    fetchHeatmap(page, heatmapDays);
+  };
+
+  // Handle days range change
+  const handleDaysRangeChange = (days) => {
+    const numDays = parseInt(days, 10);
+    setDaysRange(numDays);
+    fetchOverview(numDays);
+  };
+
+  // Handle heatmap days change
+  const handleHeatmapDaysChange = (days) => {
+    const numDays = parseInt(days, 10);
+    setHeatmapDays(numDays);
+    fetchHeatmap(selectedPage, numDays);
   };
 
   // Manual refresh
   const handleRefresh = async () => {
     setLoading(true);
     await Promise.all([
-      fetchOverview(),
+      fetchOverview(daysRange),
       fetchRealtime(),
-      fetchHeatmap(selectedPage)
+      fetchHeatmap(selectedPage, heatmapDays)
     ]);
     setLoading(false);
     setLastUpdate(new Date());
@@ -202,6 +294,20 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Date Range Selector */}
+          <Select value={String(daysRange)} onValueChange={handleDaysRangeChange}>
+            <SelectTrigger className="w-[140px]" data-testid="days-range-select">
+              <Calendar className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Date range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="14">Last 14 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+          
           {/* Connection Status */}
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
             wsConnected 
@@ -381,18 +487,31 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
               <Zap className="w-5 h-5 text-orange-500" />
               Click Heatmap
             </CardTitle>
-            <Select value={selectedPage} onValueChange={handlePageChange}>
-              <SelectTrigger className="w-[200px]" data-testid="heatmap-page-select">
-                <SelectValue placeholder="Select page" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="/pricing">Pricing Page</SelectItem>
-                <SelectItem value="/features">Features Page</SelectItem>
-                <SelectItem value="/home">Home Page</SelectItem>
-                <SelectItem value="/contact">Contact Page</SelectItem>
-                <SelectItem value="/signup">Signup Page</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={selectedPage} onValueChange={handlePageChange}>
+                <SelectTrigger className="w-[160px]" data-testid="heatmap-page-select">
+                  <SelectValue placeholder="Select page" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="/pricing">Pricing Page</SelectItem>
+                  <SelectItem value="/features">Features Page</SelectItem>
+                  <SelectItem value="/home">Home Page</SelectItem>
+                  <SelectItem value="/contact">Contact Page</SelectItem>
+                  <SelectItem value="/signup">Signup Page</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={String(heatmapDays)} onValueChange={handleHeatmapDaysChange}>
+                <SelectTrigger className="w-[120px]" data-testid="heatmap-days-select">
+                  <SelectValue placeholder="Days" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 days</SelectItem>
+                  <SelectItem value="14">14 days</SelectItem>
+                  <SelectItem value="30">30 days</SelectItem>
+                  <SelectItem value="90">90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -454,7 +573,7 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
       {/* Traffic Trends */}
       <Card data-testid="traffic-trends-card">
         <CardHeader>
-          <CardTitle>Traffic Trends (Last 7 Days)</CardTitle>
+          <CardTitle>Traffic Trends (Last {daysRange} Days)</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
