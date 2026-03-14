@@ -47,13 +47,12 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
         setOverview(data);
         return data;
       } else {
-        console.warn('Overview endpoint returned:', response.status);
-        // Use mock data if endpoint not available
-        setOverview(generateMockOverview());
+        console.error('Overview endpoint error:', response.status);
+        toast.error('Failed to load overview data');
       }
     } catch (error) {
-      console.log('Using mock overview data:', error);
-      setOverview(generateMockOverview());
+      console.error('Overview fetch error:', error);
+      toast.error('Failed to connect to analytics API');
     }
   }, [fetchWithAuth, daysRange]);
 
@@ -66,12 +65,10 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
         setRealtime(data);
         return data;
       } else {
-        console.warn('Realtime endpoint returned:', response.status);
-        setRealtime(generateMockRealtime());
+        console.error('Realtime endpoint error:', response.status);
       }
     } catch (error) {
-      console.log('Using mock realtime data:', error);
-      setRealtime(generateMockRealtime());
+      console.error('Realtime fetch error:', error);
     }
   }, [fetchWithAuth]);
 
@@ -86,12 +83,10 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
         setHeatmapData(data);
         return data;
       } else {
-        console.warn('Heatmap endpoint returned:', response.status);
-        setHeatmapData(generateMockHeatmap(pageUrl));
+        console.error('Heatmap endpoint error:', response.status);
       }
     } catch (error) {
-      console.log('Using mock heatmap data:', error);
-      setHeatmapData(generateMockHeatmap(pageUrl));
+      console.error('Heatmap fetch error:', error);
     }
   }, [fetchWithAuth, heatmapDays]);
 
@@ -735,69 +730,5 @@ const getHeatColorRGB = (intensity) => {
   if (intensity >= 20) return 'rgba(34, 197, 94, 0.5)';
   return 'rgba(59, 130, 246, 0.4)';
 };
-
-// Mock data generators
-const generateMockOverview = () => ({
-  total_visitors: 12847,
-  visitors_change: 12.5,
-  conversions: 423,
-  conversions_change: 8.3,
-  bounce_rate: 42.7,
-  bounce_rate_change: -3.2,
-  avg_session_duration: 245,
-  session_duration_change: 5.7,
-  daily_traffic: [
-    { date: 'Mon', visitors: 1823, pageviews: 4521, conversions: 58 },
-    { date: 'Tue', visitors: 1945, pageviews: 4832, conversions: 62 },
-    { date: 'Wed', visitors: 2103, pageviews: 5214, conversions: 71 },
-    { date: 'Thu', visitors: 1876, pageviews: 4654, conversions: 59 },
-    { date: 'Fri', visitors: 2234, pageviews: 5543, conversions: 78 },
-    { date: 'Sat', visitors: 1456, pageviews: 3612, conversions: 45 },
-    { date: 'Sun', visitors: 1410, pageviews: 3501, conversions: 50 }
-  ]
-});
-
-const generateMockRealtime = () => ({
-  active_visitors: Math.floor(Math.random() * 50) + 30,
-  active_sessions: Math.floor(Math.random() * 60) + 40,
-  visitors_timeline: Array.from({ length: 12 }, (_, i) => ({
-    time: `${String(i * 2).padStart(2, '0')}:00`,
-    visitors: Math.floor(Math.random() * 100) + 20
-  })),
-  sessions_by_source: [
-    { name: 'Direct', count: Math.floor(Math.random() * 30) + 15 },
-    { name: 'Organic', count: Math.floor(Math.random() * 25) + 10 },
-    { name: 'Referral', count: Math.floor(Math.random() * 15) + 5 },
-    { name: 'Social', count: Math.floor(Math.random() * 10) + 3 },
-    { name: 'Paid', count: Math.floor(Math.random() * 8) + 2 }
-  ],
-  top_pages: [
-    { path: '/pricing', visitors: Math.floor(Math.random() * 20) + 10 },
-    { path: '/features', visitors: Math.floor(Math.random() * 15) + 8 },
-    { path: '/home', visitors: Math.floor(Math.random() * 12) + 6 },
-    { path: '/contact', visitors: Math.floor(Math.random() * 8) + 3 },
-    { path: '/signup', visitors: Math.floor(Math.random() * 6) + 2 }
-  ]
-});
-
-const generateMockHeatmap = (pageUrl) => ({
-  page_url: pageUrl,
-  total_clicks: Math.floor(Math.random() * 5000) + 2000,
-  ctr: (Math.random() * 10 + 2).toFixed(1),
-  avg_scroll_depth: Math.floor(Math.random() * 30) + 60,
-  engagement_score: Math.floor(Math.random() * 30) + 65,
-  click_zones: [
-    { element: 'CTA Button', clicks: Math.floor(Math.random() * 800) + 400, percentage: 85, intensity: 95 },
-    { element: 'Pricing Cards', clicks: Math.floor(Math.random() * 600) + 300, percentage: 72, intensity: 78 },
-    { element: 'Navigation Menu', clicks: Math.floor(Math.random() * 400) + 200, percentage: 58, intensity: 62 },
-    { element: 'Feature List', clicks: Math.floor(Math.random() * 300) + 150, percentage: 45, intensity: 48 },
-    { element: 'Footer Links', clicks: Math.floor(Math.random() * 150) + 50, percentage: 22, intensity: 25 }
-  ],
-  click_points: Array.from({ length: 25 }, () => ({
-    x: Math.random() * 80 + 10,
-    y: Math.random() * 70 + 15,
-    intensity: Math.floor(Math.random() * 100)
-  }))
-});
 
 export default WebAnalytics;
