@@ -17,7 +17,10 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
-  Calendar
+  Calendar,
+  Download,
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -267,6 +270,64 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
     toast.success('Data refreshed');
   };
 
+  // Export to CSV
+  const handleExportCSV = async (dataType = 'overview') => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `${ANALYTICS_BACKEND_URL}/api/dashboard/export/csv?data_type=${dataType}&days=${daysRange}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `analytics_${dataType}_${daysRange}days.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        toast.success(`${dataType} data exported to CSV`);
+      } else {
+        toast.error('Failed to export CSV');
+      }
+    } catch (error) {
+      console.error('CSV export error:', error);
+      toast.error('Export failed');
+    }
+  };
+
+  // Export to PDF
+  const handleExportPDF = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `${ANALYTICS_BACKEND_URL}/api/dashboard/export/pdf?days=${daysRange}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `analytics_report_${daysRange}days.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        toast.success('Report exported to PDF');
+      } else {
+        toast.error('Failed to export PDF');
+      }
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error('Export failed');
+    }
+  };
+
   if (loading && !overview) {
     return (
       <div className="flex items-center justify-center h-96" data-testid="web-analytics-loading">
@@ -329,6 +390,30 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          
+          {/* Export Buttons */}
+          <div className="flex items-center gap-1 border-l border-border pl-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportCSV('overview')}
+              data-testid="export-csv-btn"
+              title="Export to CSV"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1" />
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              data-testid="export-pdf-btn"
+              title="Export to PDF"
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              PDF
+            </Button>
+          </div>
         </div>
       </div>
 
