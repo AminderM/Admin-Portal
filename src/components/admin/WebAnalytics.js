@@ -20,7 +20,14 @@ import {
   Calendar,
   Download,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Mail,
+  Plus,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  X,
+  Settings
 } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -37,6 +44,9 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
   const [heatmapDays, setHeatmapDays] = useState(30);
   const [wsConnected, setWsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [schedules, setSchedules] = useState([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const pingIntervalRef = useRef(null);
@@ -328,6 +338,94 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
     }
   };
 
+  // Fetch scheduled reports
+  const fetchSchedules = useCallback(async () => {
+    setSchedulesLoading(true);
+    try {
+      const response = await fetchWithAuth(`${ANALYTICS_BACKEND_URL}/api/dashboard/reports/schedules`);
+      if (response.ok) {
+        const data = await response.json();
+        setSchedules(data.schedules || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch schedules:', error);
+    } finally {
+      setSchedulesLoading(false);
+    }
+  }, [fetchWithAuth]);
+
+  // Create new schedule
+  const createSchedule = async (scheduleData) => {
+    try {
+      const response = await fetchWithAuth(`${ANALYTICS_BACKEND_URL}/api/dashboard/reports/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scheduleData)
+      });
+      
+      if (response.ok) {
+        toast.success('Report schedule created');
+        fetchSchedules();
+        return true;
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Failed to create schedule');
+        return false;
+      }
+    } catch (error) {
+      console.error('Create schedule error:', error);
+      toast.error('Failed to create schedule');
+      return false;
+    }
+  };
+
+  // Toggle schedule active/inactive
+  const toggleSchedule = async (scheduleId) => {
+    try {
+      const response = await fetchWithAuth(
+        `${ANALYTICS_BACKEND_URL}/api/dashboard/reports/schedule/${scheduleId}/toggle`,
+        { method: 'POST' }
+      );
+      
+      if (response.ok) {
+        toast.success('Schedule updated');
+        fetchSchedules();
+      } else {
+        toast.error('Failed to update schedule');
+      }
+    } catch (error) {
+      console.error('Toggle schedule error:', error);
+      toast.error('Failed to update schedule');
+    }
+  };
+
+  // Delete schedule
+  const deleteSchedule = async (scheduleId) => {
+    try {
+      const response = await fetchWithAuth(
+        `${ANALYTICS_BACKEND_URL}/api/dashboard/reports/schedule/${scheduleId}`,
+        { method: 'DELETE' }
+      );
+      
+      if (response.ok) {
+        toast.success('Schedule deleted');
+        fetchSchedules();
+      } else {
+        toast.error('Failed to delete schedule');
+      }
+    } catch (error) {
+      console.error('Delete schedule error:', error);
+      toast.error('Failed to delete schedule');
+    }
+  };
+
+  // Load schedules when modal opens
+  useEffect(() => {
+    if (showScheduleModal) {
+      fetchSchedules();
+    }
+  }, [showScheduleModal, fetchSchedules]);
+
   if (loading && !overview) {
     return (
       <div className="flex items-center justify-center h-96" data-testid="web-analytics-loading">
@@ -413,9 +511,32 @@ const WebAnalytics = ({ fetchWithAuth, BACKEND_URL }) => {
               <FileText className="w-4 h-4 mr-1" />
               PDF
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowScheduleModal(true)}
+              data-testid="schedule-reports-btn"
+              title="Schedule Email Reports"
+            >
+              <Mail className="w-4 h-4 mr-1" />
+              Schedule
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Schedule Reports Modal */}
+      {showScheduleModal && (
+        <ScheduleReportsModal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          schedules={schedules}
+          loading={schedulesLoading}
+          onCreate={createSchedule}
+          onToggle={toggleSchedule}
+          onDelete={deleteSchedule}
+        />
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -814,6 +935,272 @@ const getHeatColorRGB = (intensity) => {
   if (intensity >= 40) return 'rgba(234, 179, 8, 0.6)';
   if (intensity >= 20) return 'rgba(34, 197, 94, 0.5)';
   return 'rgba(59, 130, 246, 0.4)';
+};
+
+// Schedule Reports Modal Component
+const ScheduleReportsModal = ({ isOpen, onClose, schedules, loading, onCreate, onToggle, onDelete }) => {
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    frequency: 'weekly',
+    email: '',
+    report_type: 'full',
+    day_of_week: 1,
+    time: '09:00',
+    include_csv: true,
+    report_days: 7
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.email) {
+      toast.error('Email is required');
+      return;
+    }
+    const success = await onCreate(formData);
+    if (success) {
+      setShowForm(false);
+      setFormData({
+        frequency: 'weekly',
+        email: '',
+        report_type: 'full',
+        day_of_week: 1,
+        time: '09:00',
+        include_csv: true,
+        report_days: 7
+      });
+    }
+  };
+
+  const frequencyLabels = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly'
+  };
+
+  const dayLabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="schedule-modal">
+      <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Mail className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold">Scheduled Email Reports</h3>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Modal Content */}
+        <div className="p-4 overflow-y-auto max-h-[60vh]">
+          {/* Add New Schedule Button */}
+          {!showForm && (
+            <Button 
+              onClick={() => setShowForm(true)} 
+              className="w-full mb-4"
+              data-testid="add-schedule-btn"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Schedule
+            </Button>
+          )}
+
+          {/* New Schedule Form */}
+          {showForm && (
+            <Card className="mb-4" data-testid="schedule-form">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">New Report Schedule</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Email */}
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium">Email Address *</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="admin@company.com"
+                        className="w-full mt-1 px-3 py-2 border border-border rounded-md bg-background"
+                        required
+                        data-testid="schedule-email-input"
+                      />
+                    </div>
+
+                    {/* Frequency */}
+                    <div>
+                      <label className="text-sm font-medium">Frequency</label>
+                      <select
+                        value={formData.frequency}
+                        onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                        className="w-full mt-1 px-3 py-2 border border-border rounded-md bg-background"
+                        data-testid="schedule-frequency-select"
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+
+                    {/* Day of Week (for weekly) */}
+                    {formData.frequency === 'weekly' && (
+                      <div>
+                        <label className="text-sm font-medium">Day</label>
+                        <select
+                          value={formData.day_of_week}
+                          onChange={(e) => setFormData({ ...formData, day_of_week: parseInt(e.target.value) })}
+                          className="w-full mt-1 px-3 py-2 border border-border rounded-md bg-background"
+                        >
+                          {dayLabels.map((day, idx) => (
+                            <option key={idx} value={idx}>{day}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Time */}
+                    <div>
+                      <label className="text-sm font-medium">Time</label>
+                      <input
+                        type="time"
+                        value={formData.time}
+                        onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                        className="w-full mt-1 px-3 py-2 border border-border rounded-md bg-background"
+                      />
+                    </div>
+
+                    {/* Report Type */}
+                    <div>
+                      <label className="text-sm font-medium">Report Type</label>
+                      <select
+                        value={formData.report_type}
+                        onChange={(e) => setFormData({ ...formData, report_type: e.target.value })}
+                        className="w-full mt-1 px-3 py-2 border border-border rounded-md bg-background"
+                      >
+                        <option value="full">Full Report</option>
+                        <option value="summary">Summary</option>
+                        <option value="kpi_only">KPIs Only</option>
+                      </select>
+                    </div>
+
+                    {/* Data Range */}
+                    <div>
+                      <label className="text-sm font-medium">Data Range</label>
+                      <select
+                        value={formData.report_days}
+                        onChange={(e) => setFormData({ ...formData, report_days: parseInt(e.target.value) })}
+                        className="w-full mt-1 px-3 py-2 border border-border rounded-md bg-background"
+                      >
+                        <option value={7}>Last 7 days</option>
+                        <option value={14}>Last 14 days</option>
+                        <option value={30}>Last 30 days</option>
+                        <option value={90}>Last 90 days</option>
+                      </select>
+                    </div>
+
+                    {/* Include CSV */}
+                    <div className="col-span-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="include_csv"
+                        checked={formData.include_csv}
+                        onChange={(e) => setFormData({ ...formData, include_csv: e.target.checked })}
+                        className="rounded"
+                      />
+                      <label htmlFor="include_csv" className="text-sm">Attach CSV data files</label>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button type="submit" data-testid="save-schedule-btn">
+                      Create Schedule
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Existing Schedules List */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              {schedules.length > 0 ? 'Active Schedules' : 'No scheduled reports'}
+            </h4>
+            
+            {loading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+              </div>
+            ) : (
+              schedules.map((schedule) => (
+                <div 
+                  key={schedule.id} 
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                  data-testid={`schedule-item-${schedule.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{schedule.email}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        schedule.is_active 
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                      }`}>
+                        {schedule.is_active ? 'Active' : 'Paused'}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {frequencyLabels[schedule.frequency]} at {schedule.time}
+                      {schedule.frequency === 'weekly' && ` on ${dayLabels[schedule.day_of_week]}`}
+                      {' • '}{schedule.report_type} report • {schedule.report_days} days
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onToggle(schedule.id)}
+                      title={schedule.is_active ? 'Pause' : 'Activate'}
+                    >
+                      {schedule.is_active ? (
+                        <ToggleRight className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <ToggleLeft className="w-5 h-5 text-gray-400" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDelete(schedule.id)}
+                      className="text-red-500 hover:text-red-600"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-border bg-muted/30">
+          <p className="text-xs text-muted-foreground">
+            Reports are sent via email at the scheduled time. Ensure SMTP is configured on the server.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default WebAnalytics;
