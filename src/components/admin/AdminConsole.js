@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Home, Users, TrendingUp, Package, LogOut, Zap, Truck, Globe } from 'lucide-react';
+import { Home, Users, TrendingUp, Package, LogOut, Zap, Truck, Globe, BarChart3 } from 'lucide-react';
 import SubscriptionManager from './SubscriptionManager';
 import SalesAnalyticsNew from './SalesAnalyticsNew';
 import CRMView from './CRMView';
@@ -17,6 +17,7 @@ import RouteMateApp from '../route-mate/RouteMateApp';
 import PlatformUserManagement from './PlatformUserManagement';
 import CarrierLookup from './CarrierLookup';
 import WebsiteCMS from './WebsiteCMS';
+import WebAnalytics from './WebAnalytics';
 import ThemeToggle from '../ThemeToggle';
 
 const AdminConsole = () => {
@@ -197,6 +198,12 @@ const AdminConsole = () => {
       ]
     },
     {
+      name: 'Analytics',
+      items: [
+        { id: 'web-analytics', label: 'Web Analytics', icon: BarChart3 },
+      ]
+    },
+    {
       name: 'Developers',
       items: [
         { id: 'products', label: 'Products', icon: Package },
@@ -247,6 +254,8 @@ const AdminConsole = () => {
         return <SubscriptionManager fetchWithAuth={fetchWithAuth} BACKEND_URL={BACKEND_URL} />;
       case 'analytics':
         return <SalesAnalyticsNew tenants={tenants} fetchWithAuth={fetchWithAuth} BACKEND_URL={BACKEND_URL} />;
+      case 'web-analytics':
+        return <WebAnalytics fetchWithAuth={fetchWithAuth} BACKEND_URL={BACKEND_URL} />;
       case 'products':
         return <ProductsView plans={plans} onProductClick={handleProductClick} />;
       case 'product-detail':
