@@ -1,0 +1,80 @@
+{
+  "test_summary": {
+    "total_tests": 9,
+    "passed_tests": 1,
+    "success_rate": "11.1%",
+    "timestamp": "2026-03-14T18:53:19.096424"
+  },
+  "test_results": [
+    {
+      "test_name": "Login Authentication",
+      "success": true,
+      "message": "Login successful, token acquired",
+      "response_data": {
+        "user": {
+          "email": "aminderpro@gmail.com",
+          "full_name": "Platform Admin",
+          "phone": "0000000000",
+          "role": "platform_admin",
+          "id": "59488fd7-31fd-4318-9089-84e571a1b0ec",
+          "created_at": "2026-03-02T08:06:43.465000",
+          "is_active": true,
+          "registration_status": "verified",
+          "fleet_owner_id": null,
+          "email_verified": true,
+          "verification_token": null,
+          "token_expires_at": null,
+          "password_hash": "$2b$12$GWlEBSQWywsMjcioIB/xteEI9JiUlIYqSprOblLH6BFnE4KzZDm4a"
+        }
+      }
+    },
+    {
+      "test_name": "Dashboard Overview API",
+      "success": false,
+      "message": "Status 404: {\"detail\":\"Not Found\"}",
+      "response_data": null
+    },
+    {
+      "test_name": "Dashboard Overview API",
+      "success": false,
+      "message": "Status 404: {\"detail\":\"Not Found\"}",
+      "response_data": null
+    },
+    {
+      "test_name": "Dashboard Overview API",
+      "success": false,
+      "message": "Status 404: {\"detail\":\"Not Found\"}",
+      "response_data": null
+    },
+    {
+      "test_name": "Realtime Data API",
+      "success": false,
+      "message": "Status 404: {\"detail\":\"Not Found\"}",
+      "response_data": null
+    },
+    {
+      "test_name": "Heatmap Data API",
+      "success": false,
+      "message": "Status 404: {\"detail\":\"Not Found\"}",
+      "response_data": null
+    },
+    {
+      "test_name": "Heatmap Data API",
+      "success": false,
+      "message": "Status 404: {\"detail\":\"Not Found\"}",
+      "response_data": null
+    },
+    {
+      "test_name": "Heatmap Data API",
+      "success": false,
+      "message": "Status 404: {\"detail\":\"Not Found\"}",
+      "response_data": null
+    },
+    {
+      "test_name": "WebSocket Endpoint",
+      "success": false,
+      "message": "WebSocket connection failed or no pong response",
+      "response_data": null
+    }
+  ]
+}
