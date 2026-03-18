@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,7 @@ import {
 import { toast } from 'sonner';
 import { 
   Plus, Package, Users, Building2, DollarSign, TrendingUp, 
-  Edit, Trash2, Check, X, Search, UserPlus, Zap, Copy
+  Edit, Trash2, Check, X, Search, UserPlus, Zap, Copy, Briefcase
 } from 'lucide-react';
 
 const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
@@ -39,6 +39,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
   const [assignments, setAssignments] = useState([]);
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [workspaces, setWorkspaces] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -68,24 +69,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
   // Entity search for assignment modal
   const [entitySearchQuery, setEntitySearchQuery] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    await Promise.all([
-      loadBundles(),
-      loadProducts(),
-      loadAssignments(),
-      loadStats(),
-      loadUsers(),
-      loadCompanies()
-    ]);
-    setLoading(false);
-  };
-
-  const loadBundles = async () => {
+  const loadBundles = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles`);
       if (res.ok) {
@@ -95,9 +79,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load bundles:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/products`);
       if (res.ok) {
@@ -107,9 +91,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load products:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadAssignments = async () => {
+  const loadAssignments = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/assignments`);
       if (res.ok) {
@@ -119,9 +103,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load assignments:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/stats/overview`);
       if (res.ok) {
@@ -131,9 +115,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load stats:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/admin/users?limit=500`);
       if (res.ok) {
@@ -143,9 +127,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load users:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/companies`);
       if (res.ok) {
@@ -155,7 +139,37 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load companies:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
+
+  const loadWorkspaces = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/workspaces`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaces(data.workspaces || []);
+      }
+    } catch (e) {
+      console.error('Failed to load workspaces:', e);
+    }
+  }, [fetchWithAuth, BACKEND_URL]);
+
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([
+        loadBundles(),
+        loadProducts(),
+        loadAssignments(),
+        loadStats(),
+        loadUsers(),
+        loadCompanies(),
+        loadWorkspaces()
+      ]);
+      setLoading(false);
+    };
+    loadData();
+  }, [loadBundles, loadProducts, loadAssignments, loadStats, loadUsers, loadCompanies, loadWorkspaces]);
 
   const handleCreateBundle = async () => {
     if (!bundleForm.name || !bundleForm.monthly_price || bundleForm.products.length === 0) {
@@ -171,7 +185,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
           product_id: p.id,
           product_name: p.name,
           included_seats: p.included_seats || 5,
-          included_storage_gb: 10
+          included_storage_gb: 10,
+          workspaces: p.workspaces || []
         })),
         monthly_price: parseFloat(bundleForm.monthly_price),
         is_active: bundleForm.is_active
@@ -211,7 +226,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
           product_id: p.id || p.product_id,
           product_name: p.name || p.product_name,
           included_seats: p.included_seats || 5,
-          included_storage_gb: 10
+          included_storage_gb: 10,
+          workspaces: p.workspaces || []
         })),
         monthly_price: parseFloat(bundleForm.monthly_price),
         is_active: bundleForm.is_active
@@ -315,7 +331,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
         id: p.product_id,
         name: p.product_name,
         price: p.product_price || 0,
-        included_seats: p.included_seats || 5
+        included_seats: p.included_seats || 5,
+        workspaces: p.workspaces || []
       })),
       monthly_price: bundle.monthly_price.toString(),
       is_active: bundle.is_active
@@ -344,7 +361,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
         id: p.product_id,
         name: p.product_name,
         price: p.product_price || 0,
-        included_seats: p.included_seats || 5
+        included_seats: p.included_seats || 5,
+        workspaces: p.workspaces || []
       })),
       monthly_price: bundle.monthly_price.toString(),
       is_active: true
@@ -375,9 +393,32 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } else {
       setBundleForm(prev => ({
         ...prev,
-        products: [...prev.products, { ...product, included_seats: product.default_seats || 5 }]
+        products: [...prev.products, { 
+          ...product, 
+          included_seats: product.default_seats || 5,
+          workspaces: [] // Initialize with empty workspaces array
+        }]
       }));
     }
+  };
+
+  const toggleWorkspaceForProduct = (productId, workspaceId) => {
+    setBundleForm(prev => ({
+      ...prev,
+      products: prev.products.map(p => {
+        if (p.id !== productId) return p;
+        
+        const currentWorkspaces = p.workspaces || [];
+        const hasWorkspace = currentWorkspaces.includes(workspaceId);
+        
+        return {
+          ...p,
+          workspaces: hasWorkspace
+            ? currentWorkspaces.filter(ws => ws !== workspaceId)
+            : [...currentWorkspaces, workspaceId]
+        };
+      })
+    }));
   };
 
   const calculateOriginalPrice = () => {
@@ -402,11 +443,11 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
           <p className="text-muted-foreground">Create product bundles and assign subscriptions to users and companies</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => openAssignModal()} variant="outline">
+          <Button onClick={() => openAssignModal()} variant="outline" data-testid="assign-subscription-btn">
             <UserPlus className="w-4 h-4 mr-2" />
             Assign Subscription
           </Button>
-          <Button onClick={() => { resetBundleForm(); setShowBundleModal(true); }} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => { resetBundleForm(); setShowBundleModal(true); }} className="bg-primary hover:bg-primary/90" data-testid="create-bundle-btn">
             <Plus className="w-4 h-4 mr-2" />
             Create Bundle
           </Button>
@@ -752,25 +793,78 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
               </div>
             </div>
 
-            {/* Product Selection */}
+            {/* Product Selection with Workspace Assignment */}
             <div>
               <Label className="mb-2 block">Select Products to Include *</Label>
-              <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto border rounded-lg p-3">
+              <p className="text-sm text-muted-foreground mb-3">
+                Click a product to add it, then select which workspaces it grants access to.
+              </p>
+              <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto border rounded-lg p-3">
                 {products.map(product => {
-                  const isSelected = bundleForm.products.some(p => p.id === product.id);
+                  const selectedProduct = bundleForm.products.find(p => p.id === product.id);
+                  const isSelected = !!selectedProduct;
                   return (
                     <div
                       key={product.id}
-                      onClick={() => toggleProductInBundle(product)}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                        isSelected ? 'border-primary bg-muted' : 'hover:border-gray-400'
+                      className={`border rounded-lg transition-all ${
+                        isSelected ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{product.name}</span>
-                        {isSelected && <Check className="w-5 h-5 text-foreground" />}
+                      {/* Product Header - Click to Toggle */}
+                      <div 
+                        onClick={() => toggleProductInBundle(product)}
+                        className="p-3 cursor-pointer flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-medium">{product.name}</span>
+                          <p className="text-sm text-muted-foreground">${product.price}/mo</p>
+                        </div>
+                        {isSelected ? (
+                          <Check className="w-5 h-5 text-primary" />
+                        ) : (
+                          <Plus className="w-5 h-5 text-muted-foreground" />
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">${product.price}/mo</p>
+                      
+                      {/* Workspace Selection - Only when product is selected */}
+                      {isSelected && (
+                        <div className="border-t px-3 py-3 bg-muted/50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Briefcase className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Workspaces for this product:</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {workspaces.map(workspace => {
+                              const isWorkspaceSelected = selectedProduct.workspaces?.includes(workspace.id);
+                              return (
+                                <div
+                                  key={workspace.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleWorkspaceForProduct(product.id, workspace.id);
+                                  }}
+                                  className={`p-2 border rounded cursor-pointer text-sm transition-all ${
+                                    isWorkspaceSelected 
+                                      ? 'border-primary bg-primary/10 text-primary' 
+                                      : 'border-border hover:border-gray-400'
+                                  }`}
+                                  title={workspace.description}
+                                  data-testid={`workspace-toggle-${product.id}-${workspace.id}`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {isWorkspaceSelected ? (
+                                      <Check className="w-4 h-4 flex-shrink-0" />
+                                    ) : (
+                                      <div className="w-4 h-4 border rounded flex-shrink-0" />
+                                    )}
+                                    <span>{workspace.name}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -781,11 +875,25 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
             {bundleForm.products.length > 0 && (
               <div className="bg-muted rounded-lg p-4">
                 <h4 className="font-medium mb-2">Selected Products ({bundleForm.products.length})</h4>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {bundleForm.products.map(prod => (
-                    <div key={prod.id} className="flex items-center justify-between text-sm">
-                      <span>{prod.name}</span>
-                      <span className="text-muted-foreground">${prod.price}/mo</span>
+                    <div key={prod.id} className="border-b border-border pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{prod.name}</span>
+                        <span className="text-muted-foreground">${prod.price}/mo</span>
+                      </div>
+                      {prod.workspaces && prod.workspaces.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {prod.workspaces.map(wsId => {
+                            const ws = workspaces.find(w => w.id === wsId);
+                            return ws ? (
+                              <Badge key={wsId} variant="outline" className="text-xs">
+                                {ws.name}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
                     </div>
                   ))}
                   <div className="border-t pt-2 flex justify-between font-medium">
@@ -832,6 +940,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
             <Button 
               onClick={editingBundle ? handleUpdateBundle : handleCreateBundle}
               className="bg-primary hover:bg-primary/90"
+              data-testid="save-bundle-btn"
             >
               {editingBundle ? 'Update Bundle' : 'Create Bundle'}
             </Button>
@@ -1005,7 +1114,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
                           ).length === 0
                       ) && (
                         <div className="p-4 text-center text-sm text-muted-foreground">
-                          No {assignForm.entity_type === 'user' ? 'users' : 'companies'} found matching "{entitySearchQuery}"
+                          No {assignForm.entity_type === 'user' ? 'users' : 'companies'} found matching &quot;{entitySearchQuery}&quot;
                         </div>
                       )
                     )}

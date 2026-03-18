@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -26,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { Edit, MessageSquare, ChevronDown, Plus, Trash2, X, Search, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Edit, MessageSquare, ChevronDown, Plus, Trash2, X, Search, CheckCircle, AlertTriangle, History, Shield, Clock } from 'lucide-react';
 
 const USER_STATUSES = [
   { value: 'active', label: 'Active', color: 'bg-muted text-foreground' },
@@ -81,8 +82,12 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     company_website: '',
     role: 'company_admin',
     user_type: 'other',
-    status: 'active'
+    status: 'active',
+    bundle_id: ''
   });
+
+  // Bundles for assignment
+  const [bundles, setBundles] = useState([]);
   
   // Edit user form
   const [editUser, setEditUser] = useState({
@@ -94,6 +99,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     company_website: '',
     user_type: 'other',
     status: 'active',
+    role: 'company_admin',
     password: ''
   });
 
@@ -101,6 +107,11 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
+
+  // Audit Log
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
 
   // FMCSA Carrier Lookup for Create User
   const [carrierSearchQuery, setCarrierSearchQuery] = useState('');
@@ -170,12 +181,19 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-    fetchStats();
-  }, [filterStatus, searchQuery]);
+  const fetchBundles = useCallback(async () => {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/api/bundles`);
+      if (response.ok) {
+        const data = await response.json();
+        setBundles(data.bundles || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch bundles:', error);
+    }
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -193,9 +211,9 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterStatus, searchQuery, fetchWithAuth, BACKEND_URL]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await fetchWithAuth(`${BACKEND_URL}/api/admin/users/stats/overview`);
       if (response.ok) {
@@ -205,7 +223,13 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchStats();
+    fetchBundles();
+  }, [fetchUsers, fetchStats, fetchBundles]);
 
   const handleCreateUser = async () => {
     try {
@@ -220,6 +244,26 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
       });
 
       if (response.ok) {
+        const createdUser = await response.json();
+        
+        // If bundle is selected, assign it to the user
+        if (newUser.bundle_id && newUser.bundle_id !== 'none') {
+          try {
+            await fetchWithAuth(`${BACKEND_URL}/api/bundles/assign`, {
+              method: 'POST',
+              body: JSON.stringify({
+                bundle_id: newUser.bundle_id,
+                entity_type: 'user',
+                entity_id: createdUser.id || createdUser.user_id,
+                notes: 'Assigned during user creation'
+              })
+            });
+          } catch (bundleError) {
+            console.error('Failed to assign bundle:', bundleError);
+            toast.warning('User created but bundle assignment failed');
+          }
+        }
+        
         toast.success('User created successfully');
         setShowCreateModal(false);
         setNewUser({
@@ -233,7 +277,8 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
           company_website: '',
           role: 'company_admin',
           user_type: 'other',
-          status: 'active'
+          status: 'active',
+          bundle_id: ''
         });
         fetchUsers();
         fetchStats();
@@ -258,6 +303,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
       if (editUser.company_website !== undefined) updateData.company_website = editUser.company_website;
       if (editUser.user_type) updateData.user_type = editUser.user_type;
       if (editUser.status) updateData.status = editUser.status;
+      if (editUser.role) updateData.role = editUser.role;
       if (editUser.password) updateData.password = editUser.password;
 
       const response = await fetchWithAuth(`${BACKEND_URL}/api/admin/users/${selectedUser.id}`, {
@@ -334,6 +380,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
       company_website: user.company_website || '',
       user_type: user.user_type || 'other',
       status: user.status || 'active',
+      role: user.role || 'company_admin',
       password: ''
     });
     setShowEditModal(true);
@@ -354,6 +401,27 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
       setComments([]);
     } finally {
       setLoadingComments(false);
+    }
+  };
+
+  const openAuditModal = async (user) => {
+    setSelectedUser(user);
+    setShowAuditModal(true);
+    setLoadingAuditLogs(true);
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/api/admin/users/${user.id}/audit-log`);
+      if (response.ok) {
+        const data = await response.json();
+        setAuditLogs(data.logs || []);
+      } else {
+        // Show sample data structure for demo
+        setAuditLogs([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch audit logs:', error);
+      setAuditLogs([]);
+    } finally {
+      setLoadingAuditLogs(false);
     }
   };
 
@@ -452,7 +520,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
         <CardHeader className="border-b border-border">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-bold">User Management</CardTitle>
-            <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90" data-testid="create-user-btn">
               <Plus className="w-4 h-4 mr-2" />
               Create User
             </Button>
@@ -467,6 +535,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                 placeholder="Search by name, email, company, MC#, or DOT#..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="user-search-input"
               />
             </div>
             <div>
@@ -502,6 +571,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                   <tr className="bg-muted">
                     <th className="px-3 py-3 text-left text-xs font-bold text-foreground uppercase tracking-wider border-b-2 border-r border-gray-300">Name</th>
                     <th className="px-3 py-3 text-left text-xs font-bold text-foreground uppercase tracking-wider border-b-2 border-r border-gray-300">Email</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-foreground uppercase tracking-wider border-b-2 border-r border-gray-300">Role</th>
                     <th className="px-3 py-3 text-left text-xs font-bold text-foreground uppercase tracking-wider border-b-2 border-r border-gray-300">User Type</th>
                     <th className="px-3 py-3 text-left text-xs font-bold text-foreground uppercase tracking-wider border-b-2 border-r border-gray-300">Phone#</th>
                     <th className="px-3 py-3 text-left text-xs font-bold text-foreground uppercase tracking-wider border-b-2 border-r border-gray-300">Subscription</th>
@@ -516,6 +586,16 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                     <tr key={user.id} className={index % 2 === 0 ? 'bg-card' : 'bg-muted'}>
                       <td className="px-3 py-3 text-sm text-foreground border-r border-border whitespace-nowrap">{user.full_name}</td>
                       <td className="px-3 py-3 text-sm text-foreground border-r border-border whitespace-nowrap">{user.email}</td>
+                      <td className="px-3 py-3 text-sm border-r border-border whitespace-nowrap">
+                        <Badge variant="outline" className={`capitalize ${
+                          user.role === 'platform_admin' ? 'border-red-500 text-red-600' :
+                          user.role === 'company_admin' ? 'border-purple-500 text-purple-600' :
+                          user.role === 'driver' ? 'border-green-500 text-green-600' :
+                          'border-blue-500 text-blue-600'
+                        }`}>
+                          {USER_ROLES.find(r => r.value === user.role)?.label || user.role || 'No Role'}
+                        </Badge>
+                      </td>
                       <td className="px-3 py-3 text-sm border-r border-border whitespace-nowrap">
                         <Badge variant="outline" className="capitalize">
                           {USER_TYPES.find(t => t.value === user.user_type)?.label || user.user_type || 'Other'}
@@ -586,6 +666,18 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                                 {user.comments.length}
                               </span>
                             )}
+                          </Button>
+
+                          {/* Audit Log Button */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openAuditModal(user)}
+                            className="h-8 px-2"
+                            title="View Activity Log"
+                            data-testid={`audit-btn-${user.id}`}
+                          >
+                            <History className="w-4 h-4" />
                           </Button>
                         </div>
                       </td>
@@ -803,10 +895,39 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="col-span-2">
+              <Label className="text-sm font-medium">Subscription Bundle</Label>
+              <Select 
+                value={newUser.bundle_id || undefined} 
+                onValueChange={(value) => setNewUser({...newUser, bundle_id: value})}
+              >
+                <SelectTrigger className="mt-1" data-testid="create-user-bundle-select">
+                  <SelectValue placeholder="Select a bundle (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Bundle</SelectItem>
+                  {bundles.filter(b => b.is_active).map(bundle => (
+                    <SelectItem key={bundle.id} value={bundle.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{bundle.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ${bundle.monthly_price}/mo
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newUser.bundle_id && newUser.bundle_id !== 'none' && bundles.find(b => b.id === newUser.bundle_id) && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Includes: {bundles.find(b => b.id === newUser.bundle_id)?.products?.map(p => p.product_name).join(', ')}
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-            <Button onClick={handleCreateUser} className="bg-primary hover:bg-primary/90">Create User</Button>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)} data-testid="create-user-cancel-btn">Cancel</Button>
+            <Button onClick={handleCreateUser} className="bg-primary hover:bg-primary/90" data-testid="create-user-submit-btn">Create User</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -898,6 +1019,30 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="col-span-2">
+              <Label className="text-sm font-medium">System Role</Label>
+              <Select 
+                value={editUser.role} 
+                onValueChange={(value) => setEditUser({...editUser, role: value})}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {USER_ROLES.map(role => (
+                    <SelectItem key={role.value} value={role.value}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{role.label}</span>
+                        <span className="text-xs text-muted-foreground ml-2">({role.app})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {USER_ROLES.find(r => r.value === editUser.role)?.description || 'Controls access level'}
+              </p>
+            </div>
             <div>
               <Label className="text-sm font-medium">New Password (leave empty to keep)</Label>
               <Input
@@ -969,6 +1114,82 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCommentsModal(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Activity Audit Log Modal */}
+      <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Activity Log: {selectedUser?.full_name}
+            </DialogTitle>
+            <DialogDescription>
+              User activity history and audit trail
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {loadingAuditLogs ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : auditLogs.length === 0 ? (
+              <div className="text-center py-8">
+                <History className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No activity logs found for this user</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Activity will be recorded once the backend endpoint is implemented.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {auditLogs.map((log, idx) => (
+                  <div key={idx} className="flex gap-3 p-3 bg-muted rounded-lg">
+                    <div className={`p-2 rounded-full h-fit ${
+                      log.action === 'login' ? 'bg-green-100 text-green-600' :
+                      log.action === 'role_change' ? 'bg-purple-100 text-purple-600' :
+                      log.action === 'status_change' ? 'bg-orange-100 text-orange-600' :
+                      log.action === 'profile_update' ? 'bg-blue-100 text-blue-600' :
+                      log.action === 'feature_access' ? 'bg-cyan-100 text-cyan-600' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {log.action === 'login' ? <CheckCircle className="w-4 h-4" /> :
+                       log.action === 'role_change' ? <Shield className="w-4 h-4" /> :
+                       log.action === 'status_change' ? <AlertTriangle className="w-4 h-4" /> :
+                       <Clock className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium capitalize">{log.action?.replace(/_/g, ' ')}</p>
+                        <span className="text-xs text-muted-foreground">
+                          {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {log.details || log.description || 'No details available'}
+                      </p>
+                      {log.ip_address && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          IP: {log.ip_address}
+                        </p>
+                      )}
+                      {log.performed_by && log.performed_by !== selectedUser?.email && (
+                        <p className="text-xs text-muted-foreground">
+                          By: {log.performed_by}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAuditModal(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
