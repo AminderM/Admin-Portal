@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,7 +78,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
   // Entity search for assignment modal
   const [entitySearchQuery, setEntitySearchQuery] = useState('');
 
-  const loadBundles = async () => {
+  const loadBundles = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles`);
       if (res.ok) {
@@ -88,9 +88,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load bundles:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/products`);
       if (res.ok) {
@@ -100,9 +100,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load products:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadAssignments = async () => {
+  const loadAssignments = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/assignments`);
       if (res.ok) {
@@ -112,9 +112,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load assignments:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/stats/overview`);
       if (res.ok) {
@@ -124,9 +124,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load stats:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/admin/users?limit=500`);
       if (res.ok) {
@@ -136,9 +136,9 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load users:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/api/companies`);
       if (res.ok) {
@@ -148,7 +148,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (e) {
       console.error('Failed to load companies:', e);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
   // Load data on component mount
   useEffect(() => {
@@ -165,7 +165,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
       setLoading(false);
     };
     loadData();
-  }, []);
+  }, [loadBundles, loadProducts, loadAssignments, loadStats, loadUsers, loadCompanies]);
 
   const handleCreateBundle = async () => {
     if (!bundleForm.name || !bundleForm.monthly_price || bundleForm.products.length === 0) {
@@ -439,11 +439,11 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
           <p className="text-muted-foreground">Create product bundles and assign subscriptions to users and companies</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => openAssignModal()} variant="outline">
+          <Button onClick={() => openAssignModal()} variant="outline" data-testid="assign-subscription-btn">
             <UserPlus className="w-4 h-4 mr-2" />
             Assign Subscription
           </Button>
-          <Button onClick={() => { resetBundleForm(); setShowBundleModal(true); }} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => { resetBundleForm(); setShowBundleModal(true); }} className="bg-primary hover:bg-primary/90" data-testid="create-bundle-btn">
             <Plus className="w-4 h-4 mr-2" />
             Create Bundle
           </Button>
@@ -845,6 +845,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
                                       : 'border-border hover:border-gray-400'
                                   }`}
                                   title={workspace.description}
+                                  data-testid={`workspace-toggle-${product.id}-${workspace.id}`}
                                 >
                                   <div className="flex items-center gap-2">
                                     {isWorkspaceSelected ? (
@@ -935,6 +936,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
             <Button 
               onClick={editingBundle ? handleUpdateBundle : handleCreateBundle}
               className="bg-primary hover:bg-primary/90"
+              data-testid="save-bundle-btn"
             >
               {editingBundle ? 'Update Bundle' : 'Create Bundle'}
             </Button>

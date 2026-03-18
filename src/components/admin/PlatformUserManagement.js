@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -181,13 +181,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-    fetchStats();
-    fetchBundles();
-  }, [filterStatus, searchQuery]);
-
-  const fetchBundles = async () => {
+  const fetchBundles = useCallback(async () => {
     try {
       const response = await fetchWithAuth(`${BACKEND_URL}/api/bundles`);
       if (response.ok) {
@@ -197,9 +191,9 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (error) {
       console.error('Failed to fetch bundles:', error);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -217,9 +211,9 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterStatus, searchQuery, fetchWithAuth, BACKEND_URL]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await fetchWithAuth(`${BACKEND_URL}/api/admin/users/stats/overview`);
       if (response.ok) {
@@ -229,7 +223,13 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
-  };
+  }, [fetchWithAuth, BACKEND_URL]);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchStats();
+    fetchBundles();
+  }, [fetchUsers, fetchStats, fetchBundles]);
 
   const handleCreateUser = async () => {
     try {
@@ -520,7 +520,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
         <CardHeader className="border-b border-border">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl font-bold">User Management</CardTitle>
-            <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90" data-testid="create-user-btn">
               <Plus className="w-4 h-4 mr-2" />
               Create User
             </Button>
@@ -535,6 +535,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                 placeholder="Search by name, email, company, MC#, or DOT#..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="user-search-input"
               />
             </div>
             <div>
@@ -897,10 +898,10 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
             <div className="col-span-2">
               <Label className="text-sm font-medium">Subscription Bundle</Label>
               <Select 
-                value={newUser.bundle_id} 
+                value={newUser.bundle_id || undefined} 
                 onValueChange={(value) => setNewUser({...newUser, bundle_id: value})}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1" data-testid="create-user-bundle-select">
                   <SelectValue placeholder="Select a bundle (optional)" />
                 </SelectTrigger>
                 <SelectContent>
@@ -917,7 +918,7 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                   ))}
                 </SelectContent>
               </Select>
-              {newUser.bundle_id && bundles.find(b => b.id === newUser.bundle_id) && (
+              {newUser.bundle_id && newUser.bundle_id !== 'none' && bundles.find(b => b.id === newUser.bundle_id) && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Includes: {bundles.find(b => b.id === newUser.bundle_id)?.products?.map(p => p.product_name).join(', ')}
                 </p>
@@ -925,8 +926,8 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-            <Button onClick={handleCreateUser} className="bg-primary hover:bg-primary/90">Create User</Button>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)} data-testid="create-user-cancel-btn">Cancel</Button>
+            <Button onClick={handleCreateUser} className="bg-primary hover:bg-primary/90" data-testid="create-user-submit-btn">Create User</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
