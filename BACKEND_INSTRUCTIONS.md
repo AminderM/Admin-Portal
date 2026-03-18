@@ -80,7 +80,25 @@ The `products` array in the request body now includes a `workspaces` field:
 
 ### Backend Changes Required
 
-1. **Update Bundle Schema/Model**
+1. **New Endpoint: `GET /api/bundles/workspaces`**
+   - Returns the list of available workspaces
+   - Response format:
+     ```json
+     {
+       "workspaces": [
+         { "id": "dispatch_operations", "name": "Dispatch Operations", "description": "Route planning, load assignment, driver dispatch" },
+         { "id": "accounting", "name": "Accounting", "description": "Invoicing, payments, financial reporting" },
+         { "id": "sales_business_dev", "name": "Sales/Business Development", "description": "Lead generation, CRM, rate quotes" },
+         { "id": "hr", "name": "HR", "description": "Recruitment, training, employee management" },
+         { "id": "fleet_maintenance", "name": "Fleet Maintenance", "description": "Preventive maintenance, repairs, inspections" },
+         { "id": "fleet_safety", "name": "Fleet Safety", "description": "Safety compliance, accident prevention, training" }
+       ]
+     }
+     ```
+   - The frontend fetches this on mount and uses it to render workspace checkboxes in the bundle modal
+   - This allows workspaces to be managed from the backend in the future
+
+2. **Update Bundle Schema/Model**
    - Add `workspaces` field (array of strings) to each product entry within a bundle
    - Valid values: `dispatch_operations`, `accounting`, `sales_business_dev`, `hr`, `fleet_maintenance`, `fleet_safety`
    - Field is optional (defaults to empty array `[]`)

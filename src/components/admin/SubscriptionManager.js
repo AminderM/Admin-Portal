@@ -32,16 +32,6 @@ import {
   Edit, Trash2, Check, X, Search, UserPlus, Zap, Copy, Briefcase
 } from 'lucide-react';
 
-// Workspaces/Departments available in the system
-const WORKSPACES = [
-  { id: 'dispatch_operations', name: 'Dispatch Operations', description: 'Route planning, load assignment, driver dispatch' },
-  { id: 'accounting', name: 'Accounting', description: 'Invoicing, payments, financial reporting' },
-  { id: 'sales_business_dev', name: 'Sales/Business Development', description: 'Lead generation, CRM, rate quotes' },
-  { id: 'hr', name: 'HR', description: 'Recruitment, training, employee management' },
-  { id: 'fleet_maintenance', name: 'Fleet Maintenance', description: 'Preventive maintenance, repairs, inspections' },
-  { id: 'fleet_safety', name: 'Fleet Safety', description: 'Safety compliance, accident prevention, training' }
-];
-
 const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
   const [activeTab, setActiveTab] = useState('bundles');
   const [bundles, setBundles] = useState([]);
@@ -49,6 +39,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
   const [assignments, setAssignments] = useState([]);
   const [users, setUsers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [workspaces, setWorkspaces] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -150,6 +141,18 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     }
   }, [fetchWithAuth, BACKEND_URL]);
 
+  const loadWorkspaces = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/api/bundles/workspaces`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaces(data.workspaces || []);
+      }
+    } catch (e) {
+      console.error('Failed to load workspaces:', e);
+    }
+  }, [fetchWithAuth, BACKEND_URL]);
+
   // Load data on component mount
   useEffect(() => {
     const loadData = async () => {
@@ -160,12 +163,13 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
         loadAssignments(),
         loadStats(),
         loadUsers(),
-        loadCompanies()
+        loadCompanies(),
+        loadWorkspaces()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [loadBundles, loadProducts, loadAssignments, loadStats, loadUsers, loadCompanies]);
+  }, [loadBundles, loadProducts, loadAssignments, loadStats, loadUsers, loadCompanies, loadWorkspaces]);
 
   const handleCreateBundle = async () => {
     if (!bundleForm.name || !bundleForm.monthly_price || bundleForm.products.length === 0) {
@@ -830,7 +834,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
                             <span className="text-sm font-medium">Workspaces for this product:</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {WORKSPACES.map(workspace => {
+                            {workspaces.map(workspace => {
                               const isWorkspaceSelected = selectedProduct.workspaces?.includes(workspace.id);
                               return (
                                 <div
@@ -881,7 +885,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
                       {prod.workspaces && prod.workspaces.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {prod.workspaces.map(wsId => {
-                            const ws = WORKSPACES.find(w => w.id === wsId);
+                            const ws = workspaces.find(w => w.id === wsId);
                             return ws ? (
                               <Badge key={wsId} variant="outline" className="text-xs">
                                 {ws.name}
