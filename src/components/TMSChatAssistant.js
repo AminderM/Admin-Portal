@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Send, Trash2 } from 'lucide-react';
-
+    
 const TMSChatAssistant = ({ fetchWithAuth, BACKEND_URL, user, activeDepartment }) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
