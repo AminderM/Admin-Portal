@@ -82,8 +82,12 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
     company_website: '',
     role: 'company_admin',
     user_type: 'other',
-    status: 'active'
+    status: 'active',
+    bundle_id: ''
   });
+
+  // Bundles for assignment
+  const [bundles, setBundles] = useState([]);
   
   // Edit user form
   const [editUser, setEditUser] = useState({
@@ -180,7 +184,20 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
   useEffect(() => {
     fetchUsers();
     fetchStats();
+    fetchBundles();
   }, [filterStatus, searchQuery]);
+
+  const fetchBundles = async () => {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/api/bundles`);
+      if (response.ok) {
+        const data = await response.json();
+        setBundles(data.bundles || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch bundles:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -227,6 +244,26 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
       });
 
       if (response.ok) {
+        const createdUser = await response.json();
+        
+        // If bundle is selected, assign it to the user
+        if (newUser.bundle_id && newUser.bundle_id !== 'none') {
+          try {
+            await fetchWithAuth(`${BACKEND_URL}/api/bundles/assign`, {
+              method: 'POST',
+              body: JSON.stringify({
+                bundle_id: newUser.bundle_id,
+                entity_type: 'user',
+                entity_id: createdUser.id || createdUser.user_id,
+                notes: 'Assigned during user creation'
+              })
+            });
+          } catch (bundleError) {
+            console.error('Failed to assign bundle:', bundleError);
+            toast.warning('User created but bundle assignment failed');
+          }
+        }
+        
         toast.success('User created successfully');
         setShowCreateModal(false);
         setNewUser({
@@ -240,7 +277,8 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
           company_website: '',
           role: 'company_admin',
           user_type: 'other',
-          status: 'active'
+          status: 'active',
+          bundle_id: ''
         });
         fetchUsers();
         fetchStats();
@@ -855,6 +893,35 @@ const PlatformUserManagement = ({ BACKEND_URL, fetchWithAuth }) => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-sm font-medium">Subscription Bundle</Label>
+              <Select 
+                value={newUser.bundle_id} 
+                onValueChange={(value) => setNewUser({...newUser, bundle_id: value})}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a bundle (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Bundle</SelectItem>
+                  {bundles.filter(b => b.is_active).map(bundle => (
+                    <SelectItem key={bundle.id} value={bundle.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{bundle.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ${bundle.monthly_price}/mo
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newUser.bundle_id && bundles.find(b => b.id === newUser.bundle_id) && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Includes: {bundles.find(b => b.id === newUser.bundle_id)?.products?.map(p => p.product_name).join(', ')}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>

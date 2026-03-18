@@ -29,8 +29,18 @@ import {
 import { toast } from 'sonner';
 import { 
   Plus, Package, Users, Building2, DollarSign, TrendingUp, 
-  Edit, Trash2, Check, X, Search, UserPlus, Zap, Copy
+  Edit, Trash2, Check, X, Search, UserPlus, Zap, Copy, Briefcase
 } from 'lucide-react';
+
+// Workspaces/Departments available in the system
+const WORKSPACES = [
+  { id: 'dispatch_operations', name: 'Dispatch Operations', description: 'Route planning, load assignment, driver dispatch' },
+  { id: 'accounting', name: 'Accounting', description: 'Invoicing, payments, financial reporting' },
+  { id: 'sales_business_dev', name: 'Sales/Business Development', description: 'Lead generation, CRM, rate quotes' },
+  { id: 'hr', name: 'HR', description: 'Recruitment, training, employee management' },
+  { id: 'fleet_maintenance', name: 'Fleet Maintenance', description: 'Preventive maintenance, repairs, inspections' },
+  { id: 'fleet_safety', name: 'Fleet Safety', description: 'Safety compliance, accident prevention, training' }
+];
 
 const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
   const [activeTab, setActiveTab] = useState('bundles');
@@ -67,23 +77,6 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
 
   // Entity search for assignment modal
   const [entitySearchQuery, setEntitySearchQuery] = useState('');
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    await Promise.all([
-      loadBundles(),
-      loadProducts(),
-      loadAssignments(),
-      loadStats(),
-      loadUsers(),
-      loadCompanies()
-    ]);
-    setLoading(false);
-  };
 
   const loadBundles = async () => {
     try {
@@ -157,6 +150,23 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     }
   };
 
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([
+        loadBundles(),
+        loadProducts(),
+        loadAssignments(),
+        loadStats(),
+        loadUsers(),
+        loadCompanies()
+      ]);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
   const handleCreateBundle = async () => {
     if (!bundleForm.name || !bundleForm.monthly_price || bundleForm.products.length === 0) {
       toast.error('Please fill in bundle name, price, and select at least one product');
@@ -171,7 +181,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
           product_id: p.id,
           product_name: p.name,
           included_seats: p.included_seats || 5,
-          included_storage_gb: 10
+          included_storage_gb: 10,
+          workspaces: p.workspaces || []
         })),
         monthly_price: parseFloat(bundleForm.monthly_price),
         is_active: bundleForm.is_active
@@ -211,7 +222,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
           product_id: p.id || p.product_id,
           product_name: p.name || p.product_name,
           included_seats: p.included_seats || 5,
-          included_storage_gb: 10
+          included_storage_gb: 10,
+          workspaces: p.workspaces || []
         })),
         monthly_price: parseFloat(bundleForm.monthly_price),
         is_active: bundleForm.is_active
@@ -315,7 +327,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
         id: p.product_id,
         name: p.product_name,
         price: p.product_price || 0,
-        included_seats: p.included_seats || 5
+        included_seats: p.included_seats || 5,
+        workspaces: p.workspaces || []
       })),
       monthly_price: bundle.monthly_price.toString(),
       is_active: bundle.is_active
@@ -344,7 +357,8 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
         id: p.product_id,
         name: p.product_name,
         price: p.product_price || 0,
-        included_seats: p.included_seats || 5
+        included_seats: p.included_seats || 5,
+        workspaces: p.workspaces || []
       })),
       monthly_price: bundle.monthly_price.toString(),
       is_active: true
@@ -375,9 +389,32 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
     } else {
       setBundleForm(prev => ({
         ...prev,
-        products: [...prev.products, { ...product, included_seats: product.default_seats || 5 }]
+        products: [...prev.products, { 
+          ...product, 
+          included_seats: product.default_seats || 5,
+          workspaces: [] // Initialize with empty workspaces array
+        }]
       }));
     }
+  };
+
+  const toggleWorkspaceForProduct = (productId, workspaceId) => {
+    setBundleForm(prev => ({
+      ...prev,
+      products: prev.products.map(p => {
+        if (p.id !== productId) return p;
+        
+        const currentWorkspaces = p.workspaces || [];
+        const hasWorkspace = currentWorkspaces.includes(workspaceId);
+        
+        return {
+          ...p,
+          workspaces: hasWorkspace
+            ? currentWorkspaces.filter(ws => ws !== workspaceId)
+            : [...currentWorkspaces, workspaceId]
+        };
+      })
+    }));
   };
 
   const calculateOriginalPrice = () => {
@@ -752,25 +789,77 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
               </div>
             </div>
 
-            {/* Product Selection */}
+            {/* Product Selection with Workspace Assignment */}
             <div>
               <Label className="mb-2 block">Select Products to Include *</Label>
-              <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto border rounded-lg p-3">
+              <p className="text-sm text-muted-foreground mb-3">
+                Click a product to add it, then select which workspaces it grants access to.
+              </p>
+              <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto border rounded-lg p-3">
                 {products.map(product => {
-                  const isSelected = bundleForm.products.some(p => p.id === product.id);
+                  const selectedProduct = bundleForm.products.find(p => p.id === product.id);
+                  const isSelected = !!selectedProduct;
                   return (
                     <div
                       key={product.id}
-                      onClick={() => toggleProductInBundle(product)}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                        isSelected ? 'border-primary bg-muted' : 'hover:border-gray-400'
+                      className={`border rounded-lg transition-all ${
+                        isSelected ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{product.name}</span>
-                        {isSelected && <Check className="w-5 h-5 text-foreground" />}
+                      {/* Product Header - Click to Toggle */}
+                      <div 
+                        onClick={() => toggleProductInBundle(product)}
+                        className="p-3 cursor-pointer flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-medium">{product.name}</span>
+                          <p className="text-sm text-muted-foreground">${product.price}/mo</p>
+                        </div>
+                        {isSelected ? (
+                          <Check className="w-5 h-5 text-primary" />
+                        ) : (
+                          <Plus className="w-5 h-5 text-muted-foreground" />
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">${product.price}/mo</p>
+                      
+                      {/* Workspace Selection - Only when product is selected */}
+                      {isSelected && (
+                        <div className="border-t px-3 py-3 bg-muted/50">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Briefcase className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Workspaces for this product:</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {WORKSPACES.map(workspace => {
+                              const isWorkspaceSelected = selectedProduct.workspaces?.includes(workspace.id);
+                              return (
+                                <div
+                                  key={workspace.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleWorkspaceForProduct(product.id, workspace.id);
+                                  }}
+                                  className={`p-2 border rounded cursor-pointer text-sm transition-all ${
+                                    isWorkspaceSelected 
+                                      ? 'border-primary bg-primary/10 text-primary' 
+                                      : 'border-border hover:border-gray-400'
+                                  }`}
+                                  title={workspace.description}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {isWorkspaceSelected ? (
+                                      <Check className="w-4 h-4 flex-shrink-0" />
+                                    ) : (
+                                      <div className="w-4 h-4 border rounded flex-shrink-0" />
+                                    )}
+                                    <span>{workspace.name}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -781,11 +870,25 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
             {bundleForm.products.length > 0 && (
               <div className="bg-muted rounded-lg p-4">
                 <h4 className="font-medium mb-2">Selected Products ({bundleForm.products.length})</h4>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {bundleForm.products.map(prod => (
-                    <div key={prod.id} className="flex items-center justify-between text-sm">
-                      <span>{prod.name}</span>
-                      <span className="text-muted-foreground">${prod.price}/mo</span>
+                    <div key={prod.id} className="border-b border-border pb-2 last:border-0 last:pb-0">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{prod.name}</span>
+                        <span className="text-muted-foreground">${prod.price}/mo</span>
+                      </div>
+                      {prod.workspaces && prod.workspaces.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {prod.workspaces.map(wsId => {
+                            const ws = WORKSPACES.find(w => w.id === wsId);
+                            return ws ? (
+                              <Badge key={wsId} variant="outline" className="text-xs">
+                                {ws.name}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
                     </div>
                   ))}
                   <div className="border-t pt-2 flex justify-between font-medium">
@@ -1005,7 +1108,7 @@ const SubscriptionManager = ({ BACKEND_URL, fetchWithAuth }) => {
                           ).length === 0
                       ) && (
                         <div className="p-4 text-center text-sm text-muted-foreground">
-                          No {assignForm.entity_type === 'user' ? 'users' : 'companies'} found matching "{entitySearchQuery}"
+                          No {assignForm.entity_type === 'user' ? 'users' : 'companies'} found matching &quot;{entitySearchQuery}&quot;
                         </div>
                       )
                     )}

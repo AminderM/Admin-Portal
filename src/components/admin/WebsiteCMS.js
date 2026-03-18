@@ -105,7 +105,7 @@ const WebsiteCMS = ({ fetchWithAuth, BACKEND_URL }) => {
           <p className="text-muted-foreground mt-2">Manage marketing website content and demo requests</p>
         </div>
         <a
-          href="https://admin-panel-live-4.preview.emergentagent.com:3001"
+          href="https://admin-console-dev.preview.emergentagent.com:3001"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
