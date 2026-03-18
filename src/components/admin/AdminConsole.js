@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Home, Users, TrendingUp, Package, LogOut, Zap, Truck, Globe, BarChart3 } from 'lucide-react';
+import { Home, Users, TrendingUp, Package, LogOut, Zap, Truck, Globe, BarChart3, Shield } from 'lucide-react';
 import SubscriptionManager from './SubscriptionManager';
 import SalesAnalyticsNew from './SalesAnalyticsNew';
 import CRMView from './CRMView';
@@ -18,6 +18,7 @@ import PlatformUserManagement from './PlatformUserManagement';
 import CarrierLookup from './CarrierLookup';
 import WebsiteCMS from './WebsiteCMS';
 import WebAnalytics from './WebAnalytics';
+import FeatureManager from './FeatureManager';
 import ThemeToggle from '../ThemeToggle';
 
 const AdminConsole = () => {
@@ -204,6 +205,12 @@ const AdminConsole = () => {
       ]
     },
     {
+      name: 'System',
+      items: [
+        { id: 'feature-manager', label: 'Feature Manager', icon: Shield },
+      ]
+    },
+    {
       name: 'Developers',
       items: [
         { id: 'products', label: 'Products', icon: Package },
@@ -256,6 +263,8 @@ const AdminConsole = () => {
         return <SalesAnalyticsNew tenants={tenants} fetchWithAuth={fetchWithAuth} BACKEND_URL={BACKEND_URL} />;
       case 'web-analytics':
         return <WebAnalytics fetchWithAuth={fetchWithAuth} BACKEND_URL={BACKEND_URL} />;
+      case 'feature-manager':
+        return <FeatureManager fetchWithAuth={fetchWithAuth} BACKEND_URL={BACKEND_URL} />;
       case 'products':
         return <ProductsView plans={plans} onProductClick={handleProductClick} />;
       case 'product-detail':
